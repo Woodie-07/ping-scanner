@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Ping Scanner</title>
+    </head>
+    <body>
+        <h2>Ping Scanner</h2>
+        <h4>Generate a Hilbert curve of hosts that respond to pings</h4>
+        <a href="{{ url_for('index') }}">Home</a>
+        {% block body %}
+            <br><br><br>
+            <form action="/startscan" method="post">
+                <label for="subnet">Subnet:</label><br>
+                <input type="text" id="subnet" name="subnet">
+                <input type="submit" value="Submit">
+            </form>
+            <p>Recent scans:</p>
+            {% if recentscans|length == 0 %}
+                <p>None :(</p>
+            {% else %}
+                {% for scan in recentscans %}
+                    <ul>
+                        <li>{{scan}}</li>
+                    </ul>
+                {% endfor %}
+            {% endif %}
+        {% endblock %}
+    </body>
+</html>

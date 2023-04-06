@@ -1,0 +1,23 @@
+{% extends 'index.html' %}
+ 
+{% block body %}
+    <p>Scan of {{subnet}} (id {{id}})</p>
+    <p>Submitted at {{datetime}}</p>
+    <p>State: {{state}}</p>
+    {% if results != None %}
+        <p>Results:</p>
+        {% if results|length == 0 %}
+            <p>None</p>
+        {% else %}
+            <ul>
+            {% for result in results %}
+                <li>result</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    {% endif %}
+
+    {% if image != None %}
+        <img src="{{image}}">
+    {% endif %}
+{% endblock %}
