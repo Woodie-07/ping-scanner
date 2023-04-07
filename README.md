@@ -4,7 +4,7 @@ A quick website I threw together in a couple hours. Scans a subnet for hosts tha
 I'm aware that the code isn't great, but it works.
 
 ## Warning!
-Scanning the internet, even just with ICMP pings, can result in abuse reports. Use at your own risk.
+Scanning the internet, even just with ICMP pings, can result in abuse reports. Use at your own risk. I recommend [pfcloud.io](https://pfcloud.io) for scanning the internet, they won't give you any hassle about abuse reports. I use pfcloud for hosting my own scanner.
 
 ## Usage
 1. Clone the repo
