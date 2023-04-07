@@ -102,6 +102,12 @@ def pingworker():
                 f.write(masscanConf)
 
             os.system("cd jobs/" + str(job.id) + " && masscan -c masscan.conf")
+
+            if not os.path.exists("jobs/" + str(job.id) + "/results.txt"):
+                # masscan failed to scan, probably because the range was entirely excluded
+                # just write an empty file
+                with open("jobs/" + str(job.id) + "/results.txt", "w") as f:
+                    f.write("")
             
             job.state = States.RENDERING
             db, cursor = openSQLConn()
