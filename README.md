@@ -1,6 +1,7 @@
 # pingscanner
 
 A quick website I threw together in a couple hours. Scans a subnet for hosts that respond to ICMP pings and plots them on a Hilbert curve.
+I'm aware that the code isn't great, but it works.
 
 ## Warning!
 Scanning the internet, even just with ICMP pings, can result in abuse reports. Use at your own risk.
