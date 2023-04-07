@@ -1,0 +1,11 @@
+SQLHost = "127.0.0.1"
+SQLUser = "pingscanner"
+SQLPassword = "password123"
+SQLDatabase = "pingscanner"
+
+def calcRate(cidr: int):
+    rate = (2**(32 - cidr)) >> 2
+    if rate > 100000:
+        rate = 100000
+
+    return rate

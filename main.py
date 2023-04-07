@@ -5,12 +5,14 @@ import socket
 import threading
 import os
 import time
+import config
 
 class States:
     PENDING = 0
     SCANNING = 1
     RENDERING = 2
     DONE = 3
+
 
 class Job:
     def __init__(self, id, ip, cidr, state = States.PENDING):
@@ -23,10 +25,10 @@ inProgressJobs = []
 
 def openSQLConn():
     db = mysql.connector.connect(
-        host="127.0.0.1",
-        user="pingscanner",
-        password="7OBZH%!lLXa*P*zV",
-        database="pingscanner"
+        host=config.SQLHost,
+        user=config.SQLUser,
+        password=config.SQLPassword,
+        database=config.SQLDatabase
     )
 
     return db, db.cursor()
@@ -47,7 +49,8 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS `scans` (
 	PRIMARY KEY (`id`)
 );""")
 
-cursor.execute("SELECT * FROM scans WHERE state = 0")
+# load all scans that are not done
+cursor.execute("SELECT * FROM scans WHERE state != 3")
 scans = cursor.fetchall()
 for scan in scans:
     id = scan[0]
@@ -62,28 +65,38 @@ for scan in scans:
 
 closeSQLConn(db, cursor)
 
-def worker():
+def pingworker():
     while True:
         try:
             job = inProgressJobs.pop(0)
         except IndexError:
             time.sleep(5)
             continue
+        
         if job.state == States.PENDING:
             job.state = States.SCANNING
+        
             db, cursor = openSQLConn()
             cursor.execute("UPDATE scans SET state = %s WHERE id = %s", (job.state, job.id))
             db.commit()
             closeSQLConn(db, cursor)
 
-            os.mkdir("jobs/" + str(job.id))
+        if job.state == States.SCANNING:
+            try:
+                os.mkdir("jobs/" + str(job.id))
+            except FileExistsError:
+                # likely interrupted scan, purge results and rescan
+                os.remove("jobs/" + str(job.id) + "/results.txt")
 
             subnet = subnet_tools.Subnet(job.ip, job.cidr)
 
-            with open("masscan.conf", "r") as f:
-                masscanConfTemplate = f.read()
+            rate = config.calcRate(job.cidr)
 
-            masscanConf = masscanConfTemplate.replace("RANGE", str(subnet))
+            with open("masscan.conf", "r") as f:
+                masscanConf = f.read()
+
+            masscanConf = masscanConf.replace("RANGE", str(subnet))
+            masscanConf = masscanConf.replace("RATE", str(rate))
 
             with open("jobs/" + str(job.id) + "/masscan.conf", "w") as f:
                 f.write(masscanConf)
@@ -96,6 +109,7 @@ def worker():
             db.commit()
             closeSQLConn(db, cursor)
 
+        if job.state == States.RENDERING:
             renderCIDR = job.cidr
             if renderCIDR % 2 == 1:
                 renderCIDR -= 1
@@ -108,17 +122,40 @@ def worker():
             db.commit()
             closeSQLConn(db, cursor)
 
-threading.Thread(target=worker).start()
+threading.Thread(target=pingworker, daemon=True).start()
 
 
 app = Flask(__name__)
 
 @app.route('/', methods = ['GET'])
 def index():
-    return render_template("index.html", recentscans = ["127.0.0.0/8"])
+    db, cursor = openSQLConn()
+    cursor.execute("SELECT ip, cidr, timestamp, id FROM scans ORDER BY timestamp DESC LIMIT 10")
+    recentscanslist = cursor.fetchall()
+    closeSQLConn(db, cursor)
+
+    recentscans = []
+
+    for scan in recentscanslist:
+        ip = socket.inet_ntoa(scan[0])
+        cidr = scan[1]
+        timestamp = scan[2]
+        id = scan[3]
+
+        recentscans.append({
+            "id": str(id),
+            "subnet": ip + "/" + str(cidr),
+            "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        })
+
+
+    return render_template("index.html", recentscans = recentscans, qsize = len(inProgressJobs))
 
 @app.route("/startscan", methods = ['POST'])
 def startscan():
+    if len(inProgressJobs) > 5:
+        return "<p>Queue full (max 5), try later</p><br><img src=\"https://http.cat/503\">", 503
+
     subnet = request.form.get("subnet")
     clientIP = request.remote_addr
     headers = request.headers
@@ -146,12 +183,14 @@ def startscan():
     db.commit()
     closeSQLConn(db, cursor)
 
+    inProgressJobs.append(Job(id, subnetIP, subnetCIDR, 0))
+
     return redirect("/scan/" + str(id))
 
 @app.route("/scan/<id>", methods = ['GET'])
 def scan(id):
     db, cursor = openSQLConn()
-    cursor.execute("SELECT ip, cidr, client_ip, state, timestamp FROM scans WHERE id = %s", (id,))
+    cursor.execute("SELECT ip, cidr, state, timestamp FROM scans WHERE id = %s", (id,))
     scan = cursor.fetchone()
     closeSQLConn(db, cursor)
 
@@ -160,35 +199,33 @@ def scan(id):
 
     scanIP = socket.inet_ntoa(scan[0])
     scanCIDR = scan[1]
-    scanClientIP = socket.inet_ntoa(scan[2])
-    scanState = scan[3]
-    ts = scan[4]
+    scanState = scan[2]
+    ts = scan[3]
     subnet = scanIP + "/" + str(scanCIDR)
 
-    if scanState == States.PENDING:
-        stateString = "PENDING"
-        resultsList = None
-        imageURL = None
-    elif scanState == States.SCANNING:
-        stateString = "SCANNING"
-        resultsList = None
-        imageURL = None
-    elif scanState == States.RENDERING:
-        stateString = "RENDERING"
-        with open("/scans/" + str(id) + "/results.txt", "r") as f:
-            resultsList = [line.strip() for line in f.readlines()]
-        imageURL = None
-    elif scanState == States.DONE:
-        stateString = "DONE"
-        with open("/scans/" + str(id) + "/results.txt", "r") as f:
-            resultsList = [line.strip() for line in f.readlines()]
-        imageURL = "/scan/" + str(id) + "/image.png"
+    stateString = {
+        States.PENDING: "Pending",
+        States.SCANNING: "Scanning",
+        States.RENDERING: "Rendering",
+        States.DONE: "Done"
+    }.get(scanState)
 
-    return render_template("scan.html", id = str(id), subnet = subnet, state = stateString, results = resultsList, image = imageURL, datetime = ts.strftime("%Y-%m-%d %H:%M:%S"))
+    resultsList, imageURL = None, None
+
+    if scanState >= States.RENDERING:
+        with open(f"jobs/{str(id)}/results.txt", "r") as f:
+            resultsList = [line.strip() for line in f.readlines()]
+
+    if scanState == States.DONE:
+        imageURL = f"/scan/{str(id)}/image.png"
+
+    rate = config.calcRate(job.cidr)
+
+    return render_template("scan.html", id = str(id), subnet = subnet, state = stateString, results = resultsList, image = imageURL, datetime = ts.strftime("%Y-%m-%d %H:%M:%S"), rate=str(rate))
 
 @app.route("/scan/<id>/image.png", methods = ['GET'])
 def scanimage(id):
-    return send_file("/scans/" + str(id) + "/image.png")
+    return send_file("jobs/" + str(id) + "/image.png")
   
 if __name__ == '__main__':
-    app.run(debug = True, host="0.0.0.0")
+    app.run(host="0.0.0.0", port=17462)

@@ -4,20 +4,20 @@
     <p>Scan of {{subnet}} (id {{id}})</p>
     <p>Submitted at {{datetime}}</p>
     <p>State: {{state}}</p>
+    <p>Ping rate: {{rate}} pps</p>
     {% if results != None %}
         <p>Results:</p>
         {% if results|length == 0 %}
             <p>None</p>
         {% else %}
-            <ul>
-            {% for result in results %}
-                <li>result</li>
-            {% endfor %}
-            </ul>
+            <textarea rows="10" cols="50">
+{% for result in results %}{{result}}
+{% endfor %}</textarea>
         {% endif %}
     {% endif %}
+    <br>
 
     {% if image != None %}
-        <img src="{{image}}">
+        <img src="{{image}}" width="500" style="image-rendering: pixelated;">
     {% endif %}
 {% endblock %}

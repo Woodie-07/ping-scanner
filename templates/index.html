@@ -14,13 +14,14 @@
                 <input type="text" id="subnet" name="subnet">
                 <input type="submit" value="Submit">
             </form>
+            <p>Queue length: {{qsize}}</p>
             <p>Recent scans:</p>
             {% if recentscans|length == 0 %}
                 <p>None :(</p>
             {% else %}
                 {% for scan in recentscans %}
                     <ul>
-                        <li>{{scan}}</li>
+                        <li><a href="/scan/{{scan.id}}">{{scan.subnet}} - {{scan.timestamp}}</a></li>
                     </ul>
                 {% endfor %}
             {% endif %}
