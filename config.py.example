@@ -3,6 +3,9 @@ SQLUser = "pingscanner"
 SQLPassword = "password123"
 SQLDatabase = "pingscanner"
 
+listenHost = "0.0.0.0"
+listenPort = 17462
+
 def calcRate(cidr: int):
     rate = (2**(32 - cidr)) >> 2
     if rate > 100000:
