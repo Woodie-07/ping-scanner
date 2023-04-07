@@ -225,7 +225,7 @@ def scan(id):
     if scanState == States.DONE:
         imageURL = f"/scan/{str(id)}/image.png"
 
-    rate = config.calcRate(job.cidr)
+    rate = config.calcRate(scanCIDR)
 
     return render_template("scan.html", id = str(id), subnet = subnet, state = stateString, results = resultsList, image = imageURL, datetime = ts.strftime("%Y-%m-%d %H:%M:%S"), rate=str(rate))
 
