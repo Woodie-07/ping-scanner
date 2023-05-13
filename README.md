@@ -14,4 +14,4 @@ Scanning the internet, even just with ICMP pings, can result in abuse reports. U
 5. Compile ipv4-heatmap with `make` in the ipv4-heatmap/ directory
 6. Copy config.py.example to config.py
 7. Edit `config.py` to your liking. Include your own SQL database credentials and optionally tweak the scanning rate calculation function and/or enter your own listen host/port.
-8. Run `python3 app.py` to start the webserver
+8. Run `python3 main.py` to start the webserver
